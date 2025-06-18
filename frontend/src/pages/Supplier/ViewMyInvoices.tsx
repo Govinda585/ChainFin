@@ -15,7 +15,7 @@ export default function ViewMyInvoices() {
     };
 
     fetch();
-  }, [signer, data, fetchInvoices]);
+  }, [signer, fetchInvoices]);
 
   return (
     <div className="p-6">

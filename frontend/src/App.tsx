@@ -9,7 +9,7 @@ import UploadInvoice from "./pages/Supplier/UploadInvoice";
 
 function App() {
   return (
-    <div className="bg-gray-50 h-lvh">
+    <div className="bg-gray-50 min-h-screen">
       <BrowserRouter>
         <Navbar />
         <Routes>

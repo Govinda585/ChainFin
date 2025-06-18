@@ -3,6 +3,8 @@ import { FadeLoader } from "react-spinners";
 
 import { useMintInvoiceStore } from "../../store/mintInvoiceStore";
 import { useWalletStore } from "../../store/walletStore";
+import { contractInstanceNFT } from "../../utils/contractInstance";
+import { PostMetadataJSON } from "../../api/pinataAPI";
 
 export default function MintInvoiceNFT() {
   const { fetchInvoice, loading, data } = useMintInvoiceStore();
@@ -21,10 +23,53 @@ export default function MintInvoiceNFT() {
       }
     }
     fetchData();
-  }, [data, fetchInvoice, signer]);
+  }, [data, fetchInvoice]);
 
   const handleMint = async () => {
-    // minting logic goes here
+    try {
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        alert("No invoice data to mint");
+        return;
+      }
+
+      // Assuming you want to mint the first invoice in the array
+      const invoice = data[0];
+
+      if (
+        !invoice.invoiceTitle ||
+        !invoice.desc ||
+        !invoice.amount ||
+        !invoice.ipfsPDFHash
+      ) {
+        alert("Incomplete invoice fields");
+        return;
+      }
+
+      // Prepare metadata object
+      const metadata = {
+        name: invoice.invoiceTitle,
+        description: invoice.desc,
+        amount: invoice.amount.toString(),
+        fileHash: invoice.ipfsPDFHash,
+        file_url: `https://gateway.pinata.cloud/ipfs/${invoice.ipfsPDFHash}`,
+      };
+
+      // Upload metadata JSON to IPFS
+      const metadataCID = await PostMetadataJSON(metadata);
+      const metadataURI = `https://gateway.pinata.cloud/ipfs/${metadataCID}`;
+
+      // Mint NFT with metadata URI
+      const contract = contractInstanceNFT(signer);
+      const tx = await contract.MintNFT(metadataURI);
+      await tx.wait();
+
+      console.log("✅ NFT Minted successfully!");
+      console.log("📎 Metadata URI:", metadataURI);
+      alert("NFT minted successfully!");
+    } catch (err) {
+      console.error("❌ Minting failed:", err);
+      alert("NFT minting failed. Check console for details.");
+    }
   };
 
   if (loading) {
@@ -82,6 +127,20 @@ export default function MintInvoiceNFT() {
           Mint Invoice NFT
         </button>
       </div>
+
+      {/* PDF preview of first invoice */}
+      {data && data.length > 0 && data[0].ipfsPDFHash && (
+        <div className="mt-4 max-w-xl w-full">
+          <h2 className="text-xl font-semibold mb-2">📄 Invoice Preview</h2>
+          <iframe
+            src={`https://gateway.pinata.cloud/ipfs/${data[0].ipfsPDFHash}`}
+            width="100%"
+            height="600px"
+            title="Invoice PDF"
+            className="rounded shadow border"
+          />
+        </div>
+      )}
     </div>
   );
 }
