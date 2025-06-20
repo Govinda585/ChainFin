@@ -10,6 +10,10 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
+  gasReporter: {
+    enabled: true,
+    currency: "USD",
+  },
 };
 
 export default config;

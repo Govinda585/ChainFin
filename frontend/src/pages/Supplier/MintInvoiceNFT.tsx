@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FadeLoader } from "react-spinners";
 
 import { useMintInvoiceStore } from "../../store/mintInvoiceStore";
@@ -11,12 +11,15 @@ export default function MintInvoiceNFT() {
   const hasFetchedRef = useRef(false);
   const { signer } = useWalletStore();
 
+  const [minting, setMinting] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       try {
         if (!hasFetchedRef.current && (!data || data.length === 0)) {
           await fetchInvoice();
           hasFetchedRef.current = true;
+          console.log(data);
         }
       } catch (error) {
         console.error("Failed to fetch invoices:", error);
@@ -26,26 +29,31 @@ export default function MintInvoiceNFT() {
   }, [data, fetchInvoice]);
 
   const handleMint = async () => {
+    if (!signer) {
+      alert("Wallet not connected");
+      return;
+    }
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      alert("No invoice data available");
+      return;
+    }
+
+    const invoice = data[0];
+
+    if (
+      !invoice.invoiceTitle ||
+      !invoice.desc ||
+      !invoice.amount ||
+      !invoice.ipfsPDFHash
+    ) {
+      alert("Invoice is missing required fields");
+      return;
+    }
+
     try {
-      if (!data || !Array.isArray(data) || data.length === 0) {
-        alert("No invoice data to mint");
-        return;
-      }
+      setMinting(true);
 
-      // Assuming you want to mint the first invoice in the array
-      const invoice = data[0];
-
-      if (
-        !invoice.invoiceTitle ||
-        !invoice.desc ||
-        !invoice.amount ||
-        !invoice.ipfsPDFHash
-      ) {
-        alert("Incomplete invoice fields");
-        return;
-      }
-
-      // Prepare metadata object
       const metadata = {
         name: invoice.invoiceTitle,
         description: invoice.desc,
@@ -54,21 +62,20 @@ export default function MintInvoiceNFT() {
         file_url: `https://gateway.pinata.cloud/ipfs/${invoice.ipfsPDFHash}`,
       };
 
-      // Upload metadata JSON to IPFS
       const metadataCID = await PostMetadataJSON(metadata);
       const metadataURI = `https://gateway.pinata.cloud/ipfs/${metadataCID}`;
 
-      // Mint NFT with metadata URI
       const contract = contractInstanceNFT(signer);
-      const tx = await contract.MintNFT(metadataURI);
+      const tx = await contract.mintNFT(metadataURI);
       await tx.wait();
 
-      console.log("✅ NFT Minted successfully!");
-      console.log("📎 Metadata URI:", metadataURI);
+      console.log(" NFT Minted:", metadataURI);
       alert("NFT minted successfully!");
     } catch (err) {
-      console.error("❌ Minting failed:", err);
-      alert("NFT minting failed. Check console for details.");
+      console.error(" Minting failed:", err);
+      alert("Minting failed. Check console for details.");
+    } finally {
+      setMinting(false);
     }
   };
 
@@ -76,6 +83,13 @@ export default function MintInvoiceNFT() {
     return (
       <div className="flex justify-center items-center h-[90vh]">
         <FadeLoader color="blue" />
+      </div>
+    );
+  }
+  if (!signer) {
+    return (
+      <div className="text-center p-8 text-red-500 font-medium">
+        Please connect your wallet to view invoice data.
       </div>
     );
   }
@@ -122,15 +136,20 @@ export default function MintInvoiceNFT() {
 
         <button
           onClick={handleMint}
-          className="bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg hover:bg-indigo-600 transition-colors duration-200"
+          disabled={minting}
+          className={`${
+            minting
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-indigo-500 hover:bg-indigo-600"
+          } text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200`}
         >
-          Mint Invoice NFT
+          {minting ? "Minting..." : "Mint Invoice NFT"}
         </button>
       </div>
 
-      {/* PDF preview of first invoice */}
+      {/* PDF Preview */}
       {data && data.length > 0 && data[0].ipfsPDFHash && (
-        <div className="mt-4 max-w-xl w-full">
+        <div className="mt-6 max-w-xl w-full">
           <h2 className="text-xl font-semibold mb-2">📄 Invoice Preview</h2>
           <iframe
             src={`https://gateway.pinata.cloud/ipfs/${data[0].ipfsPDFHash}`}

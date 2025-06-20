@@ -49,7 +49,7 @@ const UploadForm = () => {
       console.log(cid);
       data.file = cid;
       const contract = contractInstance(signer);
-      await contract.setInvoice(
+      await contract.createInvoice(
         data.invoiceTitle,
         data.desc,
         BigInt(data.amount),

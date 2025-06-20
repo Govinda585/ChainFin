@@ -4,17 +4,17 @@ import { fetchInvoiceMetadata } from "../api/InvoiceNFTMetadata";
 type Invoice = {
   invoiceTitle: string;
   desc: string;
-  amount: number | string;
+  amount: number;
   ipfsPDFHash: string;
 };
 interface InvoiceStore {
-  data: Invoice[] | null;
+  data: Invoice[];
   loading: boolean;
   fetchInvoice: () => Promise<void>;
 }
 
 export const useMintInvoiceStore = create<InvoiceStore>((set) => ({
-  data: null,
+  data: [],
   loading: false,
   fetchInvoice: async () => {
     set({ loading: true });
@@ -23,11 +23,11 @@ export const useMintInvoiceStore = create<InvoiceStore>((set) => ({
       console.log("Fetched invoice data:", response);
       const invoices = response.invoices;
       if (Array.isArray(invoices) && invoices.length > 0) {
-        const latestInvoice = invoices[invoices.length - 1];
-        set({ data: [latestInvoice], loading: false });
+        // Set full array, not just latest
+        set({ data: invoices, loading: false });
       } else {
         set({ data: [], loading: false });
-        console.warn("Invoice data is not an array or is empty!");
+        console.warn("No invoice data found.");
       }
     } catch (error) {
       console.error("Error fetching invoices:", error);
