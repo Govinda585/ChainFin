@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FadeLoader } from "react-spinners";
 
 import { useMintInvoiceStore } from "../../store/mintInvoiceStore";
@@ -7,26 +7,20 @@ import { contractInstanceNFT } from "../../utils/contractInstance";
 import { PostMetadataJSON } from "../../api/pinataAPI";
 
 export default function MintInvoiceNFT() {
-  const { fetchInvoice, loading, data } = useMintInvoiceStore();
-  const hasFetchedRef = useRef(false);
+  const { fetchInvoice, loading, data, hasFetched } = useMintInvoiceStore();
   const { signer } = useWalletStore();
 
   const [minting, setMinting] = useState(false);
 
+  const latestInvoice = data && data.length > 0 ? data[data.length - 1] : null;
+
   useEffect(() => {
-    async function fetchData() {
-      try {
-        if (!hasFetchedRef.current && (!data || data.length === 0)) {
-          await fetchInvoice();
-          hasFetchedRef.current = true;
-          console.log(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch invoices:", error);
-      }
+    if (signer && !hasFetched) {
+      fetchInvoice().catch((error) =>
+        console.error("Failed to fetch invoices:", error)
+      );
     }
-    fetchData();
-  }, [data, fetchInvoice]);
+  }, [signer, hasFetched, fetchInvoice]);
 
   const handleMint = async () => {
     if (!signer) {
@@ -34,19 +28,14 @@ export default function MintInvoiceNFT() {
       return;
     }
 
-    if (!data || !Array.isArray(data) || data.length === 0) {
+    if (!latestInvoice) {
       alert("No invoice data available");
       return;
     }
 
-    const invoice = data[0];
+    const { invoiceTitle, desc, amount, ipfsPDFHash } = latestInvoice;
 
-    if (
-      !invoice.invoiceTitle ||
-      !invoice.desc ||
-      !invoice.amount ||
-      !invoice.ipfsPDFHash
-    ) {
+    if (!invoiceTitle || !desc || !amount || !ipfsPDFHash) {
       alert("Invoice is missing required fields");
       return;
     }
@@ -55,11 +44,11 @@ export default function MintInvoiceNFT() {
       setMinting(true);
 
       const metadata = {
-        name: invoice.invoiceTitle,
-        description: invoice.desc,
-        amount: invoice.amount.toString(),
-        fileHash: invoice.ipfsPDFHash,
-        file_url: `https://gateway.pinata.cloud/ipfs/${invoice.ipfsPDFHash}`,
+        name: invoiceTitle,
+        description: desc,
+        amount: amount.toString(),
+        fileHash: ipfsPDFHash,
+        file_url: `https://gateway.pinata.cloud/ipfs/${ipfsPDFHash}`,
       };
 
       const metadataCID = await PostMetadataJSON(metadata);
@@ -69,10 +58,10 @@ export default function MintInvoiceNFT() {
       const tx = await contract.mintNFT(metadataURI);
       await tx.wait();
 
-      console.log(" NFT Minted:", metadataURI);
+      console.log("NFT Minted:", metadataURI);
       alert("NFT minted successfully!");
-    } catch (err) {
-      console.error(" Minting failed:", err);
+    } catch (error) {
+      console.error("Minting failed:", error);
       alert("Minting failed. Check console for details.");
     } finally {
       setMinting(false);
@@ -86,6 +75,7 @@ export default function MintInvoiceNFT() {
       </div>
     );
   }
+
   if (!signer) {
     return (
       <div className="text-center p-8 text-red-500 font-medium">
@@ -104,34 +94,27 @@ export default function MintInvoiceNFT() {
           Invoice Metadata
         </h2>
 
-        {data && data.length > 0 ? (
-          data
-            .filter((inv) => inv.invoiceTitle && inv.desc)
-            .map((invoice, index) => (
-              <ul
-                key={index}
-                className="mb-6 text-base text-gray-700 space-y-2"
-              >
-                <li>
-                  <strong className="text-gray-800">Title:</strong>{" "}
-                  {invoice.invoiceTitle}
-                </li>
-                <li>
-                  <strong className="text-gray-800">Description:</strong>{" "}
-                  {invoice.desc}
-                </li>
-                <li>
-                  <strong className="text-gray-800">Amount:</strong> $
-                  {String(invoice.amount)}
-                </li>
-                <li>
-                  <strong className="text-gray-800">File Hash:</strong>{" "}
-                  <span className="break-words">{invoice.ipfsPDFHash}</span>
-                </li>
-              </ul>
-            ))
+        {latestInvoice && latestInvoice.invoiceTitle && latestInvoice.desc ? (
+          <ul className="mb-6 text-base text-gray-700 space-y-2">
+            <li>
+              <strong className="text-gray-800">Title:</strong>{" "}
+              {latestInvoice.invoiceTitle}
+            </li>
+            <li>
+              <strong className="text-gray-800">Description:</strong>{" "}
+              {latestInvoice.desc}
+            </li>
+            <li>
+              <strong className="text-gray-800">Amount:</strong> $
+              {String(latestInvoice.amount)}
+            </li>
+            <li>
+              <strong className="text-gray-800">File Hash:</strong>{" "}
+              <span className="break-words">{latestInvoice.ipfsPDFHash}</span>
+            </li>
+          </ul>
         ) : (
-          <p className="text-gray-500">No invoice metadata found.</p>
+          <p className="text-gray-500">No valid invoice metadata found.</p>
         )}
 
         <button
@@ -148,11 +131,11 @@ export default function MintInvoiceNFT() {
       </div>
 
       {/* PDF Preview */}
-      {data && data.length > 0 && data[0].ipfsPDFHash && (
+      {latestInvoice && latestInvoice.ipfsPDFHash && (
         <div className="mt-6 max-w-xl w-full">
           <h2 className="text-xl font-semibold mb-2">📄 Invoice Preview</h2>
           <iframe
-            src={`https://gateway.pinata.cloud/ipfs/${data[0].ipfsPDFHash}`}
+            src={`https://gateway.pinata.cloud/ipfs/${latestInvoice.ipfsPDFHash}`}
             width="100%"
             height="600px"
             title="Invoice PDF"

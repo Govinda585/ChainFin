@@ -22,13 +22,15 @@ export const useViewInvoiceStore = create<ViewInvoiceStore>((set) => ({
     set({ loading: true });
     try {
       const { invoices } = await fetchInvoiceMetadata();
-      console.log(invoices);
+      console.log("Raw invoices:", invoices);
+
       const formatted = invoices.map((invoice: any) => ({
-        invoiceTitle: invoice[0],
-        desc: invoice[1],
-        amount: invoice[2],
-        ipfsPDFHash: invoice[3],
+        invoiceTitle: invoice.invoiceTitle,
+        desc: invoice.desc,
+        amount: invoice.amount,
+        ipfsPDFHash: invoice.ipfsPDFHash,
       }));
+
       set({ data: formatted, loading: false });
     } catch (error) {
       console.error("Error fetching invoices:", error);
